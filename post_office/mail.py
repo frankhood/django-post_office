@@ -77,7 +77,9 @@ def create(sender, recipients=None, cc=None, bcc=None, subject='', message='',
             headers=headers, priority=priority, status=status,
             backend_alias=backend
         )
-
+        if template:
+            email.template=template
+        
     if commit:
         email.save()
 

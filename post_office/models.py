@@ -95,7 +95,7 @@ class Email(models.Model):
         """
         subject = smart_text(self.subject)
 
-        if self.template is not None:
+        if False and self.template is not None:
             _context = Context(self.context)
             subject = Template(self.template.subject).render(_context)
             message = Template(self.template.content).render(_context)
@@ -184,7 +184,7 @@ class Log(models.Model):
     date = models.DateTimeField(auto_now_add=True)
     status = models.PositiveSmallIntegerField(_('Status'),choices=STATUS_CHOICES)
     exception_type = models.CharField(_('Exception type'),max_length=255, blank=True)
-    message = models.TextField(_('Message'))
+    message = models.TextField(_('Message'), blank=True, null=True)
 
     class Meta:
         app_label = 'post_office'
@@ -200,7 +200,8 @@ class EmailTemplate(models.Model):
     """
     Model to hold template information from db
     """
-    name = models.CharField(_('Name'),max_length=255, help_text=_("e.g: 'welcome_email'"))
+    name = models.CharField(_('Name'),max_length=255, 
+                            help_text=_("e.g: 'welcome_email' -- Do not change this field! It is for internal use only"))
     description = models.TextField(_('Description'), blank=True,
         help_text=_("Description of this template."))
     created = models.DateTimeField(auto_now_add=True)
@@ -208,9 +209,13 @@ class EmailTemplate(models.Model):
     subject = models.CharField(max_length=255, blank=True,
         verbose_name=_("Subject"), validators=[validate_template_syntax])
     content = models.TextField(blank=True,
-        verbose_name=_("Content"), validators=[validate_template_syntax])
+        verbose_name=_("Content"), validators=[validate_template_syntax],
+        help_text = _("The fields between '{{' and '}}' are the variables while the text that is included in the tags '{% comment%}' and '{% endcomment%}' will not be rendered in the mail \
+                                                   <br/> Do not remove the fields included in the tags '{%' '%}'"))
     html_content = models.TextField(blank=True,
-        verbose_name=_("HTML content"), validators=[validate_template_syntax])
+        verbose_name=_("HTML content"), validators=[validate_template_syntax],
+        help_text = _("The fields between '{{' and '}}' are the variables while the text that is included in the tags '{% comment%}' and '{% endcomment%}' will not be rendered in the mail \
+                                                   <br/> Do not remove the fields included in the tags '{%' '%}'"))
     language = models.CharField(max_length=12,
         verbose_name=_("Language"),
         help_text=_("Render template in alternative language"),
@@ -247,22 +252,42 @@ def get_upload_path(instance, filename):
 
     return 'post_office_attachments/' + filename
 
-
-@python_2_unicode_compatible
-class Attachment(models.Model):
+class AttachmentMixin(models.Model):
     """
     A model describing an email attachment.
     """
-    file = models.FileField(_('File'),upload_to=get_upload_path)
-    name = models.CharField(_('Name'),max_length=255, help_text=_("The original filename"))
+    file = models.FileField(_('File'), upload_to=get_upload_path)
+    name = models.CharField(_('Name'), max_length=255, help_text=_("The original filename"))
+    mimetype = models.CharField(max_length=255, default='', blank=True, null=True)
+    
+    class Meta:
+        abstract = True
+        
+@python_2_unicode_compatible
+class Attachment(AttachmentMixin):
+    """
+    A model describing an email attachment.
+    """
     emails = models.ManyToManyField(Email, related_name='attachments',
                                     verbose_name=_('Email addresses'))
-    mimetype = models.CharField(max_length=255, default='', blank=True)
 
     class Meta:
         app_label = 'post_office'
         verbose_name = _("Attachment")
         verbose_name_plural = _("Attachments")
 
+    def __str__(self):
+        return self.name
+
+@python_2_unicode_compatible
+class AttachmentTemplate(AttachmentMixin):
+    
+    template_emails = models.ManyToManyField(EmailTemplate, related_name='attachment_templates')
+    
+    class Meta:
+        app_label = 'post_office'
+        verbose_name = _('Attachment Template')
+        verbose_name_plural = _('Attachments Template')
+    
     def __str__(self):
         return self.name
