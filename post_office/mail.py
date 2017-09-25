@@ -206,8 +206,11 @@ def send_queued(processes=1, log_level=None):
                                                   log_level=log_level)
         else:
             email_lists = split_emails(queued_emails, processes)
+
             pool = Pool(processes)
             results = pool.map(_send_bulk, email_lists)
+            pool.terminate()
+
             total_sent = sum([result[0] for result in results])
             total_failed = sum([result[1] for result in results])
     message = '%s emails attempted, %s sent, %s failed' % (
@@ -248,7 +251,12 @@ def _send_bulk(emails, uses_multiprocessing=True, log_level=None):
     # Prepare emails before we send these to threads for sending
     # So we don't need to access the DB from within threads
     for email in emails:
-        email.prepare_email_message()
+        # Sometimes this can fail, for example when trying to render
+        # email from a faulty Django template
+        try:
+            email.prepare_email_message()
+        except Exception as e:
+            failed_emails.append((email, e))
 
     number_of_threads = min(get_threads_per_process(), email_count)
     pool = ThreadPool(number_of_threads)

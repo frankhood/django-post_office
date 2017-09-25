@@ -586,6 +586,21 @@ or::
 Changelog
 =========
 
+Version 3.0.2
+-------------
+- Fixed memory leak when multiprocessing is used.
+- Fixed a possible error when adding a new email from Django admin. Thanks @ivlevdenis!
+
+
+Version 3.0.2
+-------------
+- `_send_bulk` now properly catches exceptions when preparing email messages.
+
+
+Version 3.0.1
+-------------
+- Fixed an infinite loop bug in `send_queued_mail` management command.
+
 
 Version 3.0.0
 -------------
