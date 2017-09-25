@@ -12,9 +12,12 @@ from django.utils.safestring import mark_safe
 from django.utils.text import Truncator
 from django.utils.translation import ugettext, ugettext_lazy as _
 
+from fhcore.apps.db.admin.mixins import (
+    ConfigurableWidgetsMixinAdmin, FixtureAdminMixin)
+
 from .fields import CommaSeparatedEmailField
 from .models import Attachment, Log, Email, EmailTemplate, STATUS
-from .utils import (add_style_inline,
+from .preview_utils import (add_style_inline,
                     POSTOFFICE_TAGS_STYLES, 
                     render_to_temporary_file,
                     POSTOFFICE_TEMPLATE_LIBS_TO_LOAD)
@@ -60,7 +63,7 @@ class CommaSeparatedEmailWidget(TextInput):
 class EmailAdmin(admin.ModelAdmin):
     list_display = ('id', 'to_display', 'subject', 'template',
                     'status', 'last_updated')
-    list_filter = ['status']
+    list_filter = ['status', 'template',]
     search_fields = ('to','subject')
     readonly_fields = ("display_mail_preview",)
 
@@ -143,7 +146,9 @@ class EmailTemplateInline(admin.StackedInline):
         return len(settings.LANGUAGES)
 
 
-class EmailTemplateAdmin(admin.ModelAdmin):
+class EmailTemplateAdmin(FixtureAdminMixin,
+                        ConfigurableWidgetsMixinAdmin,  
+                         admin.ModelAdmin):
     form = EmailTemplateAdminForm
     list_display = ('name', 'description_shortened', 'subject', 'created')
     #list_display = ('name', 'description_shortened', 'subject', 'languages_compact', 'created')
@@ -187,6 +192,32 @@ class EmailTemplateAdmin(admin.ModelAdmin):
         models.CharField: {'widget': SubjectField}
     }
     
+    dbfield_overrides = {
+        'name':{'help_text':_("Do not change this field! It is for internal use only"),
+                'label':_("ID"),
+                'required': True
+        },
+        'subject':{'label':_("Mail Subject"),},
+        'content':{
+           #'widget':CKEditorWidget(),#config_name='noimage_ckeditor'),
+           'label':_("Mail Body"),
+           'help_text':_("The fields between '{{' and '}}' are the variables while "
+                         "the text that is included in the tags "
+                         "'{% comment%}' and '{% endcomment%}' will not be rendered "
+                         " in the mail "
+                         "<br/> Do not remove the fields included in the tags '{%' '%}'"),
+        },
+        #'content_it':{'label':"Corpo della mail [ IT ]"},
+        #'content_en':{'label':"Corpo della mail [ EN ]"},
+        'html_content':{
+            'help_text':_("The fields between '{{' and '}}' are the variables while "
+                         "the text that is included in the tags "
+                         "'{% comment%}' and '{% endcomment%}' will not be rendered "
+                         " in the mail "
+                         "<br/> Do not remove the fields included in the tags '{%' '%}'"),
+        },
+    }
+    
 
     def get_queryset(self, request):
         return self.model.objects.filter(default_template__isnull=True)
@@ -216,7 +247,42 @@ class EmailTemplateAdmin(admin.ModelAdmin):
                                 'mail_message':escape(strip_spaces_between_tags(html_content_preview))})))
     mail_preview.allow_tags=True
     mail_preview.short_description=_("Preview")
-
+    
+    def get_fixture_filename(self):
+        fixture_dirname = os.path.join('project', 'core', 'fixtures')
+        try:
+            os.stat(fixture_dirname)
+        except:
+            os.mkdir(fixture_dirname)
+        return os.path.join(fixture_dirname,
+                            'emailtemplates_{0}.json'.format(formats.date_format(timezone.now(),"Ymd_Hi"))
+                            )
+        
+    #===========================================================================
+    # def mail_preview(self, content="", html_content=""):
+    #     content_preview = add_style_inline(content, POSTOFFICE_TAGS_STYLES)
+    #     content_preview = content_preview.replace('{{', '{').replace('}}', '}')
+    #     context = {}
+    #     content_preview = POSTOFFICE_TEMPLATE_LIBS_TO_LOAD+content_preview
+    #     content_preview = render_to_temporary_file(content_preview, context)
+    #     context.update({'content':content_preview})
+    #     html_content_preview = render_to_temporary_file(html_content, context)
+    #     help_text = '<div class="help">%s</div>' % (_('*Tha data in this Preview are fake and random'))
+    #     return strip_spaces_between_tags(mark_safe("{help_text}<div style='width:860px; height:500px;'><iframe style='margin-left:107px;' width='97%' height='480px' srcdoc='{mail_message}'>PREVIEW</iframe></div>\
+    #                 ".format(**{'help_text':help_text,
+    #                             'mail_message':escape(strip_spaces_between_tags(html_content_preview))})))
+    # 
+    # def mail_preview_it(self,obj=None):
+    #     return self.mail_preview(obj.content_it,obj.html_content)
+    # mail_preview_it.allow_tags=True
+    # mail_preview_it.short_description="{0} [IT]".format(_("Preview"))
+    # 
+    # def mail_preview_en(self,obj=None):
+    #     return self.mail_preview(obj.content_en,obj.html_content)
+    # mail_preview_en.allow_tags=True
+    # mail_preview_en.short_description="{0} [EN]".format(_("Preview"))
+    #===========================================================================
+    
 class AttachmentAdmin(admin.ModelAdmin):
     list_display = ('name', 'file', )
 
