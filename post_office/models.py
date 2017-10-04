@@ -185,7 +185,7 @@ class Log(models.Model):
     date = models.DateTimeField(auto_now_add=True)
     status = models.PositiveSmallIntegerField(_('Status'),choices=STATUS_CHOICES)
     exception_type = models.CharField(_('Exception type'),max_length=255, blank=True)
-    message = models.TextField(_('Message'), blank=True, null=True)
+    message = models.TextField(_('Message'), blank=True) #, null=True
 
     class Meta:
         app_label = 'post_office'

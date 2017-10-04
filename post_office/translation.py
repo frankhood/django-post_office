@@ -20,7 +20,7 @@ try:
         fields = ('subject', 'content',) 
         #required_languages = {#'en': ('title', 'slug'),'default': () }
     
-    translator.register(EmailTemplate, EmailTemplateTranslationOptions)
+    #translator.register(EmailTemplate, EmailTemplateTranslationOptions)
 except ImportError:
     pass
     

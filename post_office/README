@@ -1,0 +1,13 @@
+Step to be executed:
+1. Move translations.py in your project/apps/notifications/ package 
+2. Remove from new translations.py the comment from row:
+ "#translator.register(EmailTemplate, EmailTemplateTranslationOptions)"
+3. Move migration package in your project/apps/notifications/postoffice/ package
+4. In your settings.py add:
+
+MIGRATION_MODULES = {
+    'post_office': 'project.apps.notifications.postoffice.migrations',
+}
+
+5. ./manage.py makemigrations
+6. ./manage.py migrate
