@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-""" Juventus Memberrship > project.apps.events.models 
+""" 
     @created: 15 giu 2017 
 """
 from __future__ import absolute_import, print_function, unicode_literals
@@ -20,7 +20,7 @@ try:
         fields = ('subject', 'content',) 
         #required_languages = {#'en': ('title', 'slug'),'default': () }
     
-    translator.register(EmailTemplate, EmailTemplateTranslationOptions)
+    #translator.register(EmailTemplate, EmailTemplateTranslationOptions)
 except ImportError:
     pass
     
