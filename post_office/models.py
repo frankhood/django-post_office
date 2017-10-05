@@ -201,6 +201,7 @@ class EmailTemplate(models.Model):
     """
     Model to hold template information from db
     """
+    label = models.CharField(max_length=255,blank=True)
     name = models.CharField(_('Name'),max_length=255, 
                             help_text=_("e.g: 'welcome_email' -- Do not change this field! It is for internal use only"))
     description = models.TextField(_('Description'), blank=True,

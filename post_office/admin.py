@@ -13,7 +13,7 @@ from django.utils.text import Truncator
 from django.utils.translation import ugettext, ugettext_lazy as _
 
 from fhcore.apps.db.admin.mixins import (
-    ConfigurableWidgetsMixinAdmin, FixtureAdminMixin)
+    ConfigurableWidgetsMixinAdmin)#, FixtureAdminMixin)
 
 from .fields import CommaSeparatedEmailField
 from .models import Attachment, Log, Email, EmailTemplate, STATUS
@@ -146,11 +146,11 @@ class EmailTemplateInline(admin.StackedInline):
         return len(settings.LANGUAGES)
 
 
-class EmailTemplateAdmin(FixtureAdminMixin,
+class EmailTemplateAdmin(#FixtureAdminMixin,
                         ConfigurableWidgetsMixinAdmin,  
                          admin.ModelAdmin):
     form = EmailTemplateAdminForm
-    list_display = ('name', 'description_shortened', 'subject', 'created')
+    list_display = ('label','name', 'description_shortened', 'subject', 'created')
     #list_display = ('name', 'description_shortened', 'subject', 'languages_compact', 'created')
     search_fields = ('name', 'description', 'subject')
     
@@ -163,7 +163,7 @@ class EmailTemplateAdmin(FixtureAdminMixin,
     fieldsets = [
             (_("Settings"), { 'fields': (
                     ('name',),# 'language'),
-                    ('description', )
+                    ('label','description', )
             ),}),
             ('Email', { 'fields':(
                     ('subject',), 
