@@ -16,11 +16,14 @@ from fhcore.apps.db.admin.mixins import (
     ConfigurableWidgetsMixinAdmin)#, FixtureAdminMixin)
 
 from .fields import CommaSeparatedEmailField
+from .forms import EmailTemplateAdminForm
 from .models import Attachment, Log, Email, EmailTemplate, STATUS
 from .preview_utils import (add_style_inline,
                     POSTOFFICE_TAGS_STYLES, 
                     render_to_temporary_file,
-                    POSTOFFICE_TEMPLATE_LIBS_TO_LOAD)
+                    POSTOFFICE_TEMPLATE_LIBS_TO_LOAD,
+                    get_variables_from_content,
+                    check_add_extra_fieldset)
 
 
 
@@ -121,18 +124,6 @@ class SubjectField(TextInput):
         super(SubjectField, self).__init__(*args, **kwargs)
         self.attrs.update({'style': 'width: 610px;'})
 
-class EmailTemplateAdminForm(forms.ModelForm):
- 
-    language = forms.ChoiceField(choices=settings.LANGUAGES, required=False, 
-                                 help_text=_("Render template in alternative language"),
-                                 label=_("Language"))
- 
-    class Meta:
-        model = EmailTemplate
-        fields = ('name', 'description', 'subject',
-                  'content', 'html_content', 'language', 'default_template')
-
-
 class EmailTemplateInline(admin.StackedInline):
     form = EmailTemplateAdminForm
     model = EmailTemplate
@@ -149,7 +140,6 @@ class EmailTemplateInline(admin.StackedInline):
 class EmailTemplateAdmin(#FixtureAdminMixin,
                         ConfigurableWidgetsMixinAdmin,  
                          admin.ModelAdmin):
-    form = EmailTemplateAdminForm
     list_display = ('label','name', 'description_shortened', 'subject', 'created')
     #list_display = ('name', 'description_shortened', 'subject', 'languages_compact', 'created')
     search_fields = ('name', 'description', 'subject')
@@ -158,8 +148,10 @@ class EmailTemplateAdmin(#FixtureAdminMixin,
     inlines = []
     save_as=True
     readonly_fields = ('mail_preview',)
-        
-    
+
+    form = EmailTemplateAdminForm
+    submitted_form = None
+
     fieldsets = [
             (_("Settings"), { 'fields': (
                     ('name',),# 'language'),
@@ -218,6 +210,21 @@ class EmailTemplateAdmin(#FixtureAdminMixin,
         },
     }
     
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        obj = self.get_object(request, object_id)
+        if obj and obj.content:
+            self.variables = get_variables_from_content(obj.content)
+            self.exclude = self.variables
+            check_add_extra_fieldset(self.fieldsets, self.variables)
+
+        return super(EmailTemplateAdmin, self).change_view(request, object_id, form_url, extra_context)
+
+    def save_model(self, request, obj, form, change):
+        """
+        Given a model instance save it to the database.
+        """
+        self.submitted_form = form
+        super(EmailTemplateAdmin, self).save_model(request, obj, form, change)
 
     def get_queryset(self, request):
         return self.model.objects.filter(default_template__isnull=True)
@@ -232,12 +239,25 @@ class EmailTemplateAdmin(#FixtureAdminMixin,
         return ', '.join(languages)
     languages_compact.short_description = _("Languages")
 
-
     def mail_preview(self,obj=None):
         content_preview = add_style_inline(obj.content, POSTOFFICE_TAGS_STYLES)
-        content_preview = content_preview.replace('{{', '{').replace('}}', '}')
+
         context = {}
-        content_preview = POSTOFFICE_TEMPLATE_LIBS_TO_LOAD+content_preview
+
+        if self.submitted_form and self.submitted_form.cleaned_data:
+            if not self.variables:
+                self.variables = get_variables_from_content(obj.content)
+            
+            for var in self.variables:
+                if self.submitted_form.cleaned_data.has_key(var) and not self.submitted_form.cleaned_data.get(var) == '':
+                    new_var = var.replace('.', '_')
+                    content_preview = content_preview.replace(var, new_var)
+                    context.update({new_var: self.submitted_form.cleaned_data.get(var)})
+                else:
+                    content_preview = content_preview.replace('{{%s}}'%(var), "{%s}"%(var))
+        else:
+            content_preview = content_preview.replace('{{', '{').replace('}}', '}')
+            content_preview = POSTOFFICE_TEMPLATE_LIBS_TO_LOAD+content_preview
         content_preview = render_to_temporary_file(content_preview, context)
         context.update({'content':content_preview})
         html_content_preview = render_to_temporary_file(obj.html_content, context)
@@ -247,42 +267,35 @@ class EmailTemplateAdmin(#FixtureAdminMixin,
                                 'mail_message':escape(strip_spaces_between_tags(html_content_preview))})))
     mail_preview.allow_tags=True
     mail_preview.short_description=_("Preview")
-    
-    def get_fixture_filename(self):
-        fixture_dirname = os.path.join('project', 'core', 'fixtures')
-        try:
-            os.stat(fixture_dirname)
-        except:
-            os.mkdir(fixture_dirname)
-        return os.path.join(fixture_dirname,
-                            'emailtemplates_{0}.json'.format(formats.date_format(timezone.now(),"Ymd_Hi"))
-                            )
-        
-    #===========================================================================
-    # def mail_preview(self, content="", html_content=""):
-    #     content_preview = add_style_inline(content, POSTOFFICE_TAGS_STYLES)
+
+
+    #---------------------------------------------------------------------------
+    # def mail_preview(self,obj=None):
+    #     content_preview = add_style_inline(obj.content, POSTOFFICE_TAGS_STYLES)
     #     content_preview = content_preview.replace('{{', '{').replace('}}', '}')
     #     context = {}
     #     content_preview = POSTOFFICE_TEMPLATE_LIBS_TO_LOAD+content_preview
     #     content_preview = render_to_temporary_file(content_preview, context)
     #     context.update({'content':content_preview})
-    #     html_content_preview = render_to_temporary_file(html_content, context)
-    #     help_text = '<div class="help">%s</div>' % (_('*Tha data in this Preview are fake and random'))
+    #     html_content_preview = render_to_temporary_file(obj.html_content, context)
+    #     help_text = '<div class="help">%s</div>' % (_('*I dati in questa preview sono fittizzi e del tutto casuali'))
     #     return strip_spaces_between_tags(mark_safe("{help_text}<div style='width:860px; height:500px;'><iframe style='margin-left:107px;' width='97%' height='480px' srcdoc='{mail_message}'>PREVIEW</iframe></div>\
     #                 ".format(**{'help_text':help_text,
     #                             'mail_message':escape(strip_spaces_between_tags(html_content_preview))})))
+    # mail_preview.allow_tags=True
+    # mail_preview.short_description=_("Preview")
     # 
-    # def mail_preview_it(self,obj=None):
-    #     return self.mail_preview(obj.content_it,obj.html_content)
-    # mail_preview_it.allow_tags=True
-    # mail_preview_it.short_description="{0} [IT]".format(_("Preview"))
-    # 
-    # def mail_preview_en(self,obj=None):
-    #     return self.mail_preview(obj.content_en,obj.html_content)
-    # mail_preview_en.allow_tags=True
-    # mail_preview_en.short_description="{0} [EN]".format(_("Preview"))
-    #===========================================================================
-    
+    # def get_fixture_filename(self):
+    #     fixture_dirname = os.path.join('project', 'core', 'fixtures')
+    #     try:
+    #         os.stat(fixture_dirname)
+    #     except:
+    #         os.mkdir(fixture_dirname)
+    #     return os.path.join(fixture_dirname,
+    #                         'emailtemplates_{0}.json'.format(formats.date_format(timezone.now(),"Ymd_Hi"))
+    #                         )
+    #---------------------------------------------------------------------------
+
 class AttachmentAdmin(admin.ModelAdmin):
     list_display = ('name', 'file', )
 

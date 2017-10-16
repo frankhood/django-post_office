@@ -6,6 +6,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.template.loader import render_to_string
+from django.template import Template, Context
 from django.utils import translation
 from django.utils.encoding import force_text
 from django.utils.translation import (ugettext, ugettext_lazy as _, 
@@ -31,11 +32,19 @@ def create_temporary_file(dir=None, content=''):
 def render_to_temporary_file(content='', context=None):
     try:
         #content = unicode(content, "ascii")
-        template_temp = create_temporary_file('project/templates/mails', content.encode("utf8"))
-        content_rendered = render_to_string(template_temp.name, context)
-        template_temp.close()
+        #-----------------------------------------------------------------------
+        # template_temp = create_temporary_file('project/templates/mails', content.encode("utf8"))
+        # content_rendered = render_to_string(template_temp.name, context)
+        # template_temp.close()
+        # 
+        # return content_rendered
+        #-----------------------------------------------------------------------
         
-        return content_rendered
+        inmemory_template = Template(content.encode("utf8"))
+        if isinstance(context, Context):
+            return inmemory_template.render(context)
+        else:
+            return inmemory_template.render(Context(context))
     except UnicodeEncodeError as ex:
         logger.exception("Unicode error")
         return "La preview non e\' disponibile"
@@ -145,3 +154,25 @@ def send_postoffice_email(to_email, from_email, context,
                           subject_template_name,email_template_name,
                                   attachments = attachments,
                                   bcc=bcc)
+
+def get_variables_from_content(content):
+    content_split = content.rsplit('{{')
+    variables = []
+    for c in content_split:
+        try:
+            print(c)
+            if c.index('}}'):
+                variables.append(c.rsplit('}}')[0])
+        except ValueError:
+            pass
+    return variables
+
+def check_add_extra_fieldset(fieldsets, variables):
+    for idx, field in enumerate(fieldsets):
+        if field[0] ==  'Preview parameters':
+            break
+        if field[0] ==  'Preview':
+            fieldsets.insert((idx), (u'Preview parameters', {
+                                            'classes': ('collapse',), 
+                                            'fields': tuple(variables)}))
+            break
