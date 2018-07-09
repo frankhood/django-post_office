@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-""" Juventus Memberrship > project.apps.events.models 
-    @created: 15 giu 2017 
+""" @created: 15 giu 2017
 """
 from __future__ import absolute_import, print_function, unicode_literals
 

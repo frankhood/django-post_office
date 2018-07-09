@@ -5,6 +5,8 @@ Step to be executed:
 3. Move migration package in your project/apps/notifications/postoffice/ package
 4. In your settings.py add:
 
+'app.notifications' in PROJECT_APPS
+
 MIGRATION_MODULES = {
     'post_office': 'project.apps.notifications.postoffice.migrations',
 }
